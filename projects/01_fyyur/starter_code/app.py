@@ -28,6 +28,7 @@ db = SQLAlchemy(app)
 # TODO: connect to a local postgresql database
 migrate = Migrate(app, db)
 
+
 #----------------------------------------------------------------------------#
 # Models.
 #----------------------------------------------------------------------------#
@@ -95,6 +96,8 @@ def format_datetime(value, format='medium'):
 
 app.jinja_env.filters['datetime'] = format_datetime
 
+# app.register_error_handler(404)
+# app.register_error_handler(500)
 #----------------------------------------------------------------------------#
 # Controllers.
 #----------------------------------------------------------------------------#
@@ -111,33 +114,33 @@ def index():
 def venues():
   # TODO: replace with real venues data.
   #       num_shows should be aggregated based on number of upcoming shows per venue.
-  
   data = []
-  for distinctCityVenue in Venue.query.distinct(Venue.city):
-    app.logger.info('city = ' + str(distinctCityVenue.city))
-    cityVenues = Venue.query.filter_by(city=distinctCityVenue.city).order_by('name').all()
-    app.logger.info('cityVenues = ' + str(cityVenues))
-    cityName = cityVenues[0].city
-    stateName = cityVenues[0].state
+  try:
+    for distinctCityVenue in Venue.query.distinct(Venue.city):
+      cityVenues = Venue.query.filter_by(city=distinctCityVenue.city).order_by('name').all()
+      cityName = cityVenues[0].city
+      stateName = cityVenues[0].state
+      venueList = []
+      
+      for venue in cityVenues:
+        venueItem = {
+          "id": venue.id,
+          "name": venue.name
+        }
+        venueList.append(venueItem)
+        app.logger.info('venueList data = ' + str(venueList))
 
-    venueList = []
-    for venue in cityVenues:
-      venueItem = {
-        "id": venue.id,
-        "name": venue.name
+      cityItem = {
+        "city": cityName,
+        "state": stateName,
+        "venues" :venueList
       }
-      venueList.append(venueItem)
-      app.logger.info('venueList data = ' + str(venueList))
+      data.append(cityItem)
+      app.logger.info('dataList data = ' + str(data))
+    return render_template('pages/venues.html', areas=data)
+  except:
+      return redirect(url_for('server_error'))
 
-    cityItem = {
-      "city": cityName,
-      "state": stateName,
-      "venues" :venueList
-    }
-    data.append(cityItem)
-    app.logger.info('dataList data = ' + str(data))
-
-  return render_template('pages/venues.html', areas=data);
 
 @app.route('/venues/search', methods=['POST'])
 def search_venues():
@@ -158,61 +161,67 @@ def search_venues():
 def show_venue(venue_id):
   # shows the venue page with the given venue_id
   # TODO: replace with real venue data from the venues table, using venue_id
+  try:
+    venueDat = Venue.query.get(venue_id)
+    
+    if venueDat is None:
+      return not_found_error(404)
 
-  venueDat = Venue.query.get(venue_id)
-  showList = Show.query.filter_by(venue_id=venue_id).limit(3).all()
+    showList = Show.query.filter_by(venue_id=venue_id).limit(3).all()
 
-  # TODO: filter condition for before and after date
-  pastShows = []
-  for pastShow in showList:
-    artist = Artist.query.get(pastShow.artist_id)
-    pastShow = {
-      "artist_id": artist.id,
-      "artist_name": artist.name,
-      "artist_image_link": artist.image_link,
-      "start_time": "2019-05-21T21:30:00.000Z"
+    # TODO: filter condition for before and after date
+    pastShows = []
+    for pastShow in showList:
+      artist = Artist.query.get(pastShow.artist_id)
+      pastShow = {
+        "artist_id": artist.id,
+        "artist_name": artist.name,
+        "artist_image_link": artist.image_link,
+        "start_time": "2019-05-21T21:30:00.000Z"
+      }
+      pastShows.append(pastShow)
+    app.logger.info('pastShows data = ' + str(pastShows))
+
+    upcomingShows = []
+    for upcomingShow in showList:
+      artist = Artist.query.get(upcomingShow.artist_id)
+      upcomingShow = {
+        "artist_id": artist.id,
+        "artist_name": artist.name,
+        "artist_image_link": artist.image_link,
+        "start_time": "2019-05-21T21:30:00.000Z"
+      }
+      upcomingShows.append(upcomingShow)
+    app.logger.info('upcomingShows data = ' + str(upcomingShows))
+
+    showGenres = []
+    if venueDat.genres is not None: 
+      app.logger.info('Genres = ' + str(json.dumps(venueDat.genres)))
+      app.logger.info('Type =' + str(type(venueDat.genres)))
+      showGenres = json.loads(json.dumps(venueDat.genres))
+
+    data={
+      "id": venueDat.id,
+      "name": venueDat.name,
+      "genres": showGenres,
+      "address": venueDat.address,
+      "city": venueDat.city,
+      "state": venueDat.state,
+      "phone": venueDat.phone,
+      "website": venueDat.website,
+      "facebook_link": venueDat.facebook_link,
+      "seeking_talent": venueDat.seeking_talent,
+      "seeking_description": venueDat.seeking_description,
+      "image_link": venueDat.image_link,
+      "past_shows":pastShows,
+      "upcoming_shows": upcomingShows,
+      "past_shows_count": len(pastShows),
+      "upcoming_shows_count": len(upcomingShows),
     }
-    pastShows.append(pastShow)
-  app.logger.info('pastShows data = ' + str(pastShows))
+    return render_template('pages/show_venue.html', venue=data)
+  except :
+    return server_error(500)
 
-  upcomingShows = []
-  for upcomingShow in showList:
-    artist = Artist.query.get(upcomingShow.artist_id)
-    upcomingShow = {
-      "artist_id": artist.id,
-      "artist_name": artist.name,
-      "artist_image_link": artist.image_link,
-      "start_time": "2019-05-21T21:30:00.000Z"
-    }
-    upcomingShows.append(upcomingShow)
-  app.logger.info('upcomingShows data = ' + str(upcomingShows))
-
-  showGenres = []
-  if venueDat.genres is not None: 
-    app.logger.info('Genres = ' + str(json.dumps(venueDat.genres)))
-    app.logger.info('Type =' + str(type(venueDat.genres)))
-    showGenres = json.loads(json.dumps(venueDat.genres))
-
-  data={
-    "id": venueDat.id,
-    "name": venueDat.name,
-    "genres": showGenres,
-    "address": venueDat.address,
-    "city": venueDat.city,
-    "state": venueDat.state,
-    "phone": venueDat.phone,
-    "website": venueDat.website,
-    "facebook_link": venueDat.facebook_link,
-    "seeking_talent": venueDat.seeking_talent,
-    "seeking_description": venueDat.seeking_description,
-    "image_link": venueDat.image_link,
-    "past_shows":pastShows,
-    "upcoming_shows": upcomingShows,
-    "past_shows_count": len(pastShows),
-    "upcoming_shows_count": len(upcomingShows),
-  }
-
-  return render_template('pages/show_venue.html', venue=data)
 
 #  Create Venue
 #  ----------------------------------------------------------------
@@ -247,6 +256,7 @@ def create_venue_submission():
   finally:
     db.session.close()
     app.logger.info('New data for Venue session closed')
+
   if error:
     app.logger.info('Error orccured in new Venue')
     flash('Error occured. Venue ' + name + ' was not listed!')
@@ -266,17 +276,19 @@ def delete_venue(venue_id):
 @app.route('/artists')
 def artists():
   # TODO: render error page for no data or error
-  allArtist = Artist.query.all()
-  artistList = []
-  for artist in allArtist:
-    artistItem = {
-      "id": artist.id,
-      "name": artist.name
-    }
-    artistList.append(artistItem)
-  app.logger.info('pastShows data = ' + str(artistList))
-
-  return render_template('pages/artists.html', artists=artistList)
+  try:
+    allArtist = Artist.query.all()
+    artistList = []
+    for artist in allArtist:
+      artistItem = {
+        "id": artist.id,
+        "name": artist.name
+      }
+      artistList.append(artistItem)
+    app.logger.info('pastShows data = ' + str(artistList))
+    return render_template('pages/artists.html', artists=artistList)
+  except:
+      return server_error(500)
 
 @app.route('/artists/search', methods=['POST'])
 def search_artists():
@@ -297,95 +309,106 @@ def search_artists():
 def show_artist(artist_id):
   # shows the venue page with the given venue_id
   # TODO: replace with real venue data from the venues table, using venue_id
+  try:
+    artistDat = Artist.query.get(artist_id)
+    if artistDat is None:
+      not_found_error(404)
 
-  artistDat = Artist.query.get(artist_id)
-  app.logger.info('artistDat = ' + str(artistDat))
+    showList = Show.query.filter_by(artist_id=artist_id).limit(3).all()
 
-  showList = Show.query.filter_by(artist_id=artist_id).limit(3).all()
-  app.logger.info('showList = ' + str(showList))
+    # TODO: filter with time for past and upcoing shows
+    pastShows = []
+    for pastShow in showList:
+      artist = Artist.query.get(pastShow.artist_id)
+      pastShow = {
+        "venue_id": artist.id,
+        "venue_name": artist.name,
+        "venue_image_link": artist.image_link,
+        "start_time": "2019-05-21T21:30:00.000Z"
+      }
+      pastShows.append(pastShow)
+    app.logger.info('pastShows data = ' + str(pastShows))
 
-  # TODO: filter with time for past and upcoing shows
+    upcomingShows = []
+    for upcomingShow in showList:
+      artist = Artist.query.get(upcomingShow.artist_id)
+      upcomingShow = {
+        "venue_id": artist.id,
+        "venue_name": artist.name,
+        "venue_image_link": artist.image_link,
+        "start_time": "2019-05-21T21:30:00.000Z"
+      }
+      upcomingShows.append(upcomingShow)
+    app.logger.info('upcomingShows data = ' + str(upcomingShows))
 
-  pastShows = []
-  for pastShow in showList:
-    artist = Artist.query.get(pastShow.artist_id)
-    pastShow = {
-      "venue_id": artist.id,
-      "venue_name": artist.name,
-      "venue_image_link": artist.image_link,
-      "start_time": "2019-05-21T21:30:00.000Z"
+    showGenres = []
+    if artistDat.genres is not None: 
+      app.logger.info('Genres = ' + str(json.dumps(artistDat.genres)))
+      app.logger.info('Type =' + str(type(artistDat.genres)))
+      showGenres = json.loads(json.dumps(artistDat.genres))
+
+    data={
+      "id": artistDat.id,
+      "name": artistDat.name,
+      "genres": [showGenres],
+      "city": artistDat.city,
+      "state": artistDat.state,
+      "phone": artistDat.phone,
+      "website": artistDat.website,
+      "facebook_link": artistDat.facebook_link,
+      "seeking_venue": artistDat.seeking_venue,
+      "seeking_description": artistDat.seeking_description,
+      "image_link": artistDat.image_link,
+      "past_shows": pastShows,
+      "upcoming_shows": upcomingShows,
+      "past_shows_count": len(pastShows),
+      "upcoming_shows_count": len(upcomingShows),
     }
-    pastShows.append(pastShow)
-  app.logger.info('pastShows data = ' + str(pastShows))
-
-  upcomingShows = []
-  for upcomingShow in showList:
-    artist = Artist.query.get(upcomingShow.artist_id)
-    upcomingShow = {
-      "venue_id": artist.id,
-      "venue_name": artist.name,
-      "venue_image_link": artist.image_link,
-      "start_time": "2019-05-21T21:30:00.000Z"
-    }
-    upcomingShows.append(upcomingShow)
-  app.logger.info('upcomingShows data = ' + str(upcomingShows))
-
-  showGenres = []
-  if artistDat.genres is not None: 
-    app.logger.info('Genres = ' + str(json.dumps(artistDat.genres)))
-    app.logger.info('Type =' + str(type(artistDat.genres)))
-    showGenres = json.loads(json.dumps(artistDat.genres))
-
-  data={
-    "id": artistDat.id,
-    "name": artistDat.name,
-    "genres": [showGenres],
-    "city": artistDat.city,
-    "state": artistDat.state,
-    "phone": artistDat.phone,
-    "website": artistDat.website,
-    "facebook_link": artistDat.facebook_link,
-    "seeking_venue": artistDat.seeking_venue,
-    "seeking_description": artistDat.seeking_description,
-    "image_link": artistDat.image_link,
-    "past_shows": pastShows,
-    "upcoming_shows": upcomingShows,
-    "past_shows_count": len(pastShows),
-    "upcoming_shows_count": len(upcomingShows),
-  }
-  return render_template('pages/show_artist.html', artist=data)
+    return render_template('pages/show_artist.html', artist=data)
+  except:
+    return server_error(500)
 
 #  Update
 #  ----------------------------------------------------------------
 @app.route('/artists/<int:artist_id>/edit', methods=['GET'])
 def edit_artist(artist_id):
-  form = ArtistForm()
-  artist = Artist.query.get(artist_id)
-  app.logger.info('venue =' + str(artist))
-  app.logger.info('Type =' + str(type(artist)))
-  artistData={
-    "id": artist.id,
-    "name": artist.name,
-    "genres": artist.genres,
-    "city": artist.city,
-    "state": artist.state,
-    "phone": artist.phone,
-    "website": artist.website,
-    "facebook_link": artist.facebook_link,
-    "seeking_venue": artist.seeking_venue,
-    "seeking_description": artist.seeking_description,
-    "image_link": artist.image_link
-  }
-  # TODO: populate form with fields from artist with ID <artist_id>
-  return render_template('forms/edit_artist.html', form=form, artist=artistData)
+  try:
+    form = ArtistForm()
+    artist = Artist.query.get(artist_id)
+
+    if artist is None:
+      not_found_error(404)
+
+    app.logger.info('venue =' + str(artist))
+    app.logger.info('Type =' + str(type(artist)))
+    artistData={
+      "id": artist.id,
+      "name": artist.name,
+      "genres": artist.genres,
+      "city": artist.city,
+      "state": artist.state,
+      "phone": artist.phone,
+      "website": artist.website,
+      "facebook_link": artist.facebook_link,
+      "seeking_venue": artist.seeking_venue,
+      "seeking_description": artist.seeking_description,
+      "image_link": artist.image_link
+    }
+    return render_template('forms/edit_artist.html', form=form, artist=artistData)
+
+  except:
+    return server_error(500)
 
 @app.route('/artists/<int:artist_id>/edit', methods=['POST'])
 def edit_artist_submission(artist_id):
-  # TODO: take values from the form submitted, and update existing
-  # artist record with ID <artist_id> using the new attributes
+  # TODO: additional properties to be added
   error = False
-  artist = Artist.query.get(artist_id)
   try:
+    artist = Artist.query.get(artist_id)
+  
+    if artist is None:
+      not_found_error(404)
+
     artist.name = request.form.get('name')
     artist.city = request.form.get('city')
     artist.state = request.form.get('state')
@@ -402,6 +425,7 @@ def edit_artist_submission(artist_id):
   finally:
     db.session.close()
     app.logger.info('Edit data for Artist session closed')
+
   if error:
     app.logger.info('Error orccured in Artist edit data')
     flash('Error occured. Artist ' + artist.name + ' was not edited!')
@@ -409,27 +433,33 @@ def edit_artist_submission(artist_id):
 
 @app.route('/venues/<int:venue_id>/edit', methods=['GET'])
 def edit_venue(venue_id):
-
   form = VenueForm()
-  venue = Venue.query.get(venue_id)
-  app.logger.info('venue =' + str(venue))
-  app.logger.info('Type =' + str(type(venue)))
-  venuedata={
-    "id": venue.id,
-    "name": venue.name,
-    "genres": venue.genres,
-    "address": venue.address,
-    "city": venue.city,
-    "state": venue.state,
-    "phone": venue.phone,
-    "website": venue.website,
-    "facebook_link": venue.facebook_link,
-    "seeking_talent": venue.seeking_talent,
-    "seeking_description": venue.seeking_description,
-    "image_link": venue.image_link
-  }
-  # TODO: populate form with values from venue with ID <venue_id>
-  return render_template('forms/edit_venue.html', form=form, venue=venuedata)
+  try:
+
+    venue = Venue.query.get(venue_id)
+
+    if venue is None:
+      not_found_error(404)
+
+    venuedata={
+      "id": venue.id,
+      "name": venue.name,
+      "genres": venue.genres,
+      "address": venue.address,
+      "city": venue.city,
+      "state": venue.state,
+      "phone": venue.phone,
+      "website": venue.website,
+      "facebook_link": venue.facebook_link,
+      "seeking_talent": venue.seeking_talent,
+      "seeking_description": venue.seeking_description,
+      "image_link": venue.image_link
+    }
+
+    return render_template('forms/edit_venue.html', form=form, venue=venuedata)
+
+  except:
+    return server_error(500)
 
 @app.route('/venues/<int:venue_id>/edit', methods=['POST'])
 def edit_venue_submission(venue_id):
@@ -437,6 +467,10 @@ def edit_venue_submission(venue_id):
   # venue record with ID <venue_id> using the new attributes
   error = False
   venue = Venue.query.get(venue_id)
+
+  if venue is None:
+    not_found_error(404)
+
   try:
     venue.name = request.form.get('name')
     venue.city = request.form.get('city')
@@ -448,7 +482,7 @@ def edit_venue_submission(venue_id):
     venue.facebook_link = request.form.get('facebook_link')
     # db.session.add(venue)
     db.session.commit()
-    flash('Venue ' + name + ' was successfully edited!')
+    flash('Venue ' + venue.name + ' was successfully edited!')
   except:
     error = True
     db.session.rollback()
@@ -456,6 +490,7 @@ def edit_venue_submission(venue_id):
   finally:
     db.session.close()
     app.logger.info('Edit data for Venue session closed')
+
   if error:
     app.logger.info('Error orccured in Venue edit data')
     flash('Error occured. Venue ' + venue.name + ' was not edited!')
@@ -491,6 +526,7 @@ def create_artist_submission():
   finally:
     db.session.close()
     app.logger.info('New data for Artist session closed')
+  
   if error:
     app.logger.info('Error orccured in new artist')
     flash('Error occured. Artist ' + name + ' was not listed!')
@@ -538,14 +574,13 @@ def create_show_submission():
     venue_id = request.form.get('venue_id')
     venue = Venue.query.get(venue_id)
     if venue is None:
-      error = False
-      raise ValueError('Venue id = ' + venue_id + 'does not exist')
+      not_found_error(404)
 
     artist_id = request.form.get('artist_id')
     artist = Artist.query.get(artist_id)
     if artist is None:
-      error = False
-      raise ValueError('Artist id = ' + artist_id + 'does not exist')
+      not_found_error(404)
+
 
     start_time = "2019-05-21T21:30:00.000Z"
     show = Show(venue_id=venue_id, artist_id=artist_id, start_time=start_time)
