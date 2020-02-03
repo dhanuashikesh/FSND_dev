@@ -111,61 +111,32 @@ def index():
 def venues():
   # TODO: replace with real venues data.
   #       num_shows should be aggregated based on number of upcoming shows per venue.
+  
+  data = []
+  for distinctCityVenue in Venue.query.distinct(Venue.city):
+    app.logger.info('city = ' + str(distinctCityVenue.city))
+    cityVenues = Venue.query.filter_by(city=distinctCityVenue.city).order_by('name').all()
+    app.logger.info('cityVenues = ' + str(cityVenues))
+    cityName = cityVenues[0].city
+    stateName = cityVenues[0].state
 
-  # allVenues = Venue.query.all()
-  # app.logger.info('allVenues = ' + str(allVenues))
-  # app.logger.info('allVenues type = ' + str(type(allVenues)))
+    venueList = []
+    for venue in cityVenues:
+      venueItem = {
+        "id": venue.id,
+        "name": venue.name
+      }
+      venueList.append(venueItem)
+      app.logger.info('venueList data = ' + str(venueList))
 
-  #   # distinctCities = allVenues.distinct(city).select(city)
-  # distinctCities = Venue.query.distinct(Venue.city)
-  # app.logger.info('distinctCities = ' + str(distinctCities))
+    cityItem = {
+      "city": cityName,
+      "state": stateName,
+      "venues" :venueList
+    }
+    data.append(cityItem)
+    app.logger.info('dataList data = ' + str(data))
 
-  # dataList = []
-
-  # for city in distinctCities:
-  #   app.logger.info('city = ' + str(city))
-  #   cityVenues = Venue.query.filter_by(city=city)
-  #   app.logger.info('cityVenues = ' + str(cityVenues))
-
-  #   cityName = cityVenues.city
-  #   stateName = cityVenues.state
-  #   for venue in cityVenues:
-  #     venueItem = {
-  #       "id": venue.id,
-  #       "name": venue.name
-  #     }
-  #     venueList.append(venueItem)
-  #     app.logger.info('venueList data = ' + str(venueList))
-
-  #   cityItem = {
-  #     "city": cityName,
-  #     "state": stateName,
-  #     "venues" :venueList
-  #   }
-  #   dataList.append(cityItem)
-  #   app.logger.info('dataList data = ' + str(dataList))
-
-  data=[{
-    "city": "San Francisco",
-    "state": "CA",
-    "venues": [{
-      "id": 1,
-      "name": "The Musical Hop",
-      "num_upcoming_shows": 0,
-    }, {
-      "id": 3,
-      "name": "Park Square Live Music & Coffee",
-      "num_upcoming_shows": 1,
-    }]
-  }, {
-    "city": "New York",
-    "state": "NY",
-    "venues": [{
-      "id": 2,
-      "name": "The Dueling Pianos Bar",
-      "num_upcoming_shows": 0,
-    }]
-  }]
   return render_template('pages/venues.html', areas=data);
 
 @app.route('/venues/search', methods=['POST'])
@@ -230,10 +201,10 @@ def show_venue(venue_id):
     "city": venueDat.city,
     "state": venueDat.state,
     "phone": venueDat.phone,
-    "website": "https://www.themusicalhop.com",
+    "website": venueDat.website,
     "facebook_link": venueDat.facebook_link,
     "seeking_talent": venueDat.seeking_talent,
-    "seeking_description": "We are on the lookout for a local artist to play every two weeks. Please call us.",
+    "seeking_description": venueDat.seeking_description,
     "image_link": venueDat.image_link,
     "past_shows":pastShows,
     "upcoming_shows": upcomingShows,
