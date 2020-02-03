@@ -144,18 +144,32 @@ def venues():
 
 @app.route('/venues/search', methods=['POST'])
 def search_venues():
-  # TODO: implement search on artists with partial string search. Ensure it is case-insensitive.
-  # seach for Hop should return "The Musical Hop".
-  # search for "Music" should return "The Musical Hop" and "Park Square Live Music & Coffee"
-  response={
-    "count": 1,
-    "data": [{
-      "id": 2,
-      "name": "The Dueling Pianos Bar",
-      "num_upcoming_shows": 0,
-    }]
-  }
-  return render_template('pages/search_venues.html', results=response, search_term=request.form.get('search_term', ''))
+  try:
+    search_term = request.form["search_term"]
+    search_like = "%{}%".format(search_term)
+    app.logger.info('search_like = ' + str(search_like))
+    venues = Venue.query.filter(Venue.name.ilike(search_like)).all()
+    app.logger.info('venues = ' + str(venues))
+
+    venueList = []
+    for venueData in venues:
+      num_upcoming_shows = len(Show.query.filter_by(venue_id=venueData.id).all())
+      app.logger.info('num_upcoming_shows = ' + str(num_upcoming_shows))
+      venueItem = {
+        "id": venueData.id,
+        "name": venueData.name, 
+        "num_upcoming_shows": num_upcoming_shows,
+      }
+      venueList.append(venueItem)
+      app.logger.info('venueList data = ' + str(venueList))
+    
+    response={
+      "count": len(venues),
+      "data": venueList
+    }
+    return render_template('pages/search_venues.html', results=response, search_term=request.form.get('search_term', ''))
+  except :
+    server_error(500)
 
 @app.route('/venues/<int:venue_id>')
 def show_venue(venue_id):
@@ -278,6 +292,9 @@ def artists():
   # TODO: render error page for no data or error
   try:
     allArtist = Artist.query.all()
+    if allArtist is None:
+      return not_found_error(404)
+
     artistList = []
     for artist in allArtist:
       artistItem = {
@@ -295,15 +312,32 @@ def search_artists():
   # TODO: implement search on artists with partial string search. Ensure it is case-insensitive.
   # seach for "A" should return "Guns N Petals", "Matt Quevado", and "The Wild Sax Band".
   # search for "band" should return "The Wild Sax Band".
-  response={
-    "count": 1,
-    "data": [{
-      "id": 4,
-      "name": "Guns N Petals",
-      "num_upcoming_shows": 0,
-    }]
-  }
-  return render_template('pages/search_artists.html', results=response, search_term=request.form.get('search_term', ''))
+  try:
+    search_term = request.form["search_term"]
+    search_like = "%{}%".format(search_term)
+    app.logger.info('search_like = ' + str(search_like))
+    artists = Artist.query.filter(Artist.name.ilike(search_like)).all()
+    app.logger.info('artist = ' + str(artists))
+
+    artistList = []
+    for artistData in artists:
+      num_upcoming_shows = len(Show.query.filter_by(artist_id=artistData.id).all())
+      app.logger.info('num_upcoming_shows = ' + str(num_upcoming_shows))
+      artistItem = {
+        "id": artistData.id,
+        "name": artistData.name, 
+        "num_upcoming_shows": num_upcoming_shows,
+      }
+      artistList.append(artistItem)
+      app.logger.info('venueList data = ' + str(artistList))
+    
+    response={
+      "count": len(artists),
+      "data": artistList
+    }
+    return render_template('pages/search_artists.html', results=response, search_term=request.form.get('search_term', ''))
+  except :
+    server_error(500)
 
 @app.route('/artists/<int:artist_id>')
 def show_artist(artist_id):
@@ -312,7 +346,7 @@ def show_artist(artist_id):
   try:
     artistDat = Artist.query.get(artist_id)
     if artistDat is None:
-      not_found_error(404)
+      return not_found_error(404)
 
     showList = Show.query.filter_by(artist_id=artist_id).limit(3).all()
 
@@ -377,7 +411,7 @@ def edit_artist(artist_id):
     artist = Artist.query.get(artist_id)
 
     if artist is None:
-      not_found_error(404)
+      return not_found_error(404)
 
     app.logger.info('venue =' + str(artist))
     app.logger.info('Type =' + str(type(artist)))
@@ -407,7 +441,7 @@ def edit_artist_submission(artist_id):
     artist = Artist.query.get(artist_id)
   
     if artist is None:
-      not_found_error(404)
+      return not_found_error(404)
 
     artist.name = request.form.get('name')
     artist.city = request.form.get('city')
@@ -439,7 +473,7 @@ def edit_venue(venue_id):
     venue = Venue.query.get(venue_id)
 
     if venue is None:
-      not_found_error(404)
+      return not_found_error(404)
 
     venuedata={
       "id": venue.id,
@@ -469,7 +503,7 @@ def edit_venue_submission(venue_id):
   venue = Venue.query.get(venue_id)
 
   if venue is None:
-    not_found_error(404)
+    return not_found_error(404)
 
   try:
     venue.name = request.form.get('name')
@@ -574,13 +608,12 @@ def create_show_submission():
     venue_id = request.form.get('venue_id')
     venue = Venue.query.get(venue_id)
     if venue is None:
-      not_found_error(404)
+      return not_found_error(404)
 
     artist_id = request.form.get('artist_id')
     artist = Artist.query.get(artist_id)
     if artist is None:
-      not_found_error(404)
-
+      return not_found_error(404)
 
     start_time = "2019-05-21T21:30:00.000Z"
     show = Show(venue_id=venue_id, artist_id=artist_id, start_time=start_time)
@@ -603,7 +636,6 @@ def create_show_submission():
     flash('Show was successfully listed!')
 
   return render_template('pages/home.html')
-
 
 @app.errorhandler(404)
 def not_found_error(error):
